@@ -6,15 +6,66 @@ import shapeless._
 import shapeless.labelled._
 import shapeless.ops.coproduct.Reify
 import shapeless.ops.hlist.ToList
-import simulacrum.typeclass
 
 import scala.language.implicitConversions
 
-@typeclass trait QueryKey[A] {
+@ _root_.scala.annotation.implicitNotFound("Could not find an instance of QueryKey for ${A}")
+trait QueryKey[A] extends _root_.scala.Any with _root_.scala.Serializable {
   def queryKey(a: A): String
-}
+};
+object QueryKey extends QueryKeyInstances {
+  @scala.inline
+  def apply[A](implicit instance: QueryKey[A]): QueryKey[A] = instance;
 
-object QueryKey extends QueryKeyInstances
+  trait BaseOps[A] {
+    type TypeClassType <: QueryKey[A];
+    val typeClassInstance: TypeClassType;
+
+    def self: A;
+
+    def queryKey: String = typeClassInstance.queryKey(self)
+  };
+
+  trait ToQueryKeyOps {
+    @java.lang.SuppressWarnings(
+      scala.Array("org.wartremover.warts.ExplicitImplicitTypes", "org.wartremover.warts.ImplicitConversion")
+    )
+    implicit def toQueryKeyOps[A](target: A)(implicit tc: QueryKey[A]): BaseOps[A] {
+      type TypeClassType = QueryKey[A]
+    } = {
+      final class $anon extends BaseOps[A] {
+        type TypeClassType = QueryKey[A];
+        val self = target;
+        val typeClassInstance: TypeClassType = tc
+      };
+      new $anon()
+    }
+  };
+
+  object nonInheritedOps extends ToQueryKeyOps;
+
+  trait AllOps[A] extends BaseOps[A] {
+    type TypeClassType <: QueryKey[A];
+    val typeClassInstance: TypeClassType
+  };
+
+  object ops {
+    @java.lang.SuppressWarnings(
+      scala.Array("org.wartremover.warts.ExplicitImplicitTypes", "org.wartremover.warts.ImplicitConversion")
+    )
+    implicit def toAllQueryKeyOps[A](target: A)(implicit tc: QueryKey[A]): AllOps[A] {
+      type TypeClassType = QueryKey[A]
+    } = {
+      final class $anon extends AllOps[A] {
+        type TypeClassType = QueryKey[A];
+        val self = target;
+        val typeClassInstance: TypeClassType = tc
+      };
+      new $anon()
+    }
+  }
+
+}
 
 sealed trait QueryKeyInstances1 {
   implicit val contravariant: Contravariant[QueryKey] = new Contravariant[QueryKey] {
@@ -33,18 +84,60 @@ sealed trait QueryKeyInstances extends QueryKeyInstances1 {
   implicit final val uuidQueryValue: QueryKey[java.util.UUID] = stringQueryKey.contramap(_.toString)
 }
 
-@typeclass trait QueryValue[-A] { self =>
+@ _root_.scala.annotation.implicitNotFound("Could not find an instance of QueryValue for ${A}")
+trait QueryValue[-A] extends _root_.scala.Any with _root_.scala.Serializable { self =>
   def queryValue(a: A): Option[String]
 }
-
 object QueryValue extends QueryValueInstances {
-  def derive[A]: Derivation[A] = new Derivation[A](())
-
+  def derive[A]: Derivation[A] = new Derivation[A](());
   class Derivation[A](private val dummy: Unit) extends AnyVal {
     def by[C <: Coproduct, R <: HList](
-        key: A => String
+        key: _root_.scala.Function1[A, String]
     )(implicit gen: Generic.Aux[A, C], reify: Reify.Aux[C, R], toList: ToList[R, A]): QueryValue[A] =
-      a => toList(reify()).iterator.map(x => x -> key(x)).toMap.get(a)
+      a => toList(reify()).iterator.map((x => x.->(key(x)))).toMap.get(a)
+  };
+  @scala.inline
+  def apply[A](implicit instance: QueryValue[A]): QueryValue[A] = instance;
+  trait BaseOps[A] {
+    type TypeClassType <: QueryValue[A];
+    val typeClassInstance: TypeClassType;
+    def self: A;
+    def queryValue: Option[String] = typeClassInstance.queryValue(self)
+  };
+  trait ToQueryValueOps {
+    @java.lang.SuppressWarnings(
+      scala.Array("org.wartremover.warts.ExplicitImplicitTypes", "org.wartremover.warts.ImplicitConversion")
+    )
+    implicit def toQueryValueOps[A](target: A)(implicit tc: QueryValue[A]): BaseOps[A] {
+      type TypeClassType = QueryValue[A]
+    } = {
+      final class $anon extends BaseOps[A] {
+        type TypeClassType = QueryValue[A];
+        val self = target;
+        val typeClassInstance: TypeClassType = tc
+      };
+      new $anon()
+    }
+  };
+  object nonInheritedOps extends ToQueryValueOps;
+  trait AllOps[A] extends BaseOps[A] {
+    type TypeClassType <: QueryValue[A];
+    val typeClassInstance: TypeClassType
+  };
+  object ops {
+    @java.lang.SuppressWarnings(
+      scala.Array("org.wartremover.warts.ExplicitImplicitTypes", "org.wartremover.warts.ImplicitConversion")
+    )
+    implicit def toAllQueryValueOps[A](target: A)(implicit tc: QueryValue[A]): AllOps[A] {
+      type TypeClassType = QueryValue[A]
+    } = {
+      final class $anon extends AllOps[A] {
+        type TypeClassType = QueryValue[A];
+        val self = target;
+        val typeClassInstance: TypeClassType = tc
+      };
+      new $anon()
+    }
   }
 }
 
@@ -70,21 +163,68 @@ sealed trait QueryValueInstances extends QueryValueInstances1 {
   implicit final def optionQueryValue[A: QueryValue]: QueryValue[Option[A]] = _.flatMap(QueryValue[A].queryValue)
 }
 
-@typeclass trait QueryKeyValue[A] {
-  def queryKey(a: A): String
-
-  def queryValue(a: A): Option[String]
-
-  def queryKeyValue(a: A): (String, Option[String]) =
-    queryKey(a) -> queryValue(a)
-}
-
+@ _root_.scala.annotation.implicitNotFound("Could not find an instance of QueryKeyValue for ${A}")
+trait QueryKeyValue[A] extends _root_.scala.Any with _root_.scala.Serializable {
+  def queryKey(a: A): String;
+  def queryValue(a: A): Option[String];
+  def queryKeyValue(a: A): scala.Tuple2[String, Option[String]] = queryKey(a).->(queryValue(a))
+};
 object QueryKeyValue extends QueryKeyValueInstances {
-  def apply[T, K: QueryKey, V: QueryValue](toKey: T => K, toValue: T => V): QueryKeyValue[T] =
-    new QueryKeyValue[T] {
-      def queryKey(a: T): String = QueryKey[K].queryKey(toKey(a))
+  def apply[T, K, V](toKey: _root_.scala.Function1[T, K], toValue: _root_.scala.Function1[T, V])(implicit
+      evidence$2: QueryKey[K],
+      evidence$3: QueryValue[V]
+  ): QueryKeyValue[T] = {
+    final class $anon extends QueryKeyValue[T] {
+      def queryKey(a: T): String = QueryKey[K].queryKey(toKey(a));
       def queryValue(a: T): Option[String] = QueryValue[V].queryValue(toValue(a))
+    };
+    new $anon()
+  }
+  @scala.inline
+  def apply[A](implicit instance: QueryKeyValue[A]): QueryKeyValue[A] = instance;
+  trait BaseOps[A] {
+    type TypeClassType <: QueryKeyValue[A];
+    val typeClassInstance: TypeClassType;
+    def self: A;
+    def queryKey: String = typeClassInstance.queryKey(self);
+    def queryValue: Option[String] = typeClassInstance.queryValue(self);
+    def queryKeyValue: scala.Tuple2[String, Option[String]] = typeClassInstance.queryKeyValue(self)
+  };
+  trait ToQueryKeyValueOps {
+    @java.lang.SuppressWarnings(
+      scala.Array("org.wartremover.warts.ExplicitImplicitTypes", "org.wartremover.warts.ImplicitConversion")
+    )
+    implicit def toQueryKeyValueOps[A](target: A)(implicit tc: QueryKeyValue[A]): BaseOps[A] {
+      type TypeClassType = QueryKeyValue[A]
+    } = {
+      final class $anon extends BaseOps[A] {
+        type TypeClassType = QueryKeyValue[A];
+        val self = target;
+        val typeClassInstance: TypeClassType = tc
+      };
+      new $anon()
     }
+  };
+  object nonInheritedOps extends ToQueryKeyValueOps;
+  trait AllOps[A] extends BaseOps[A] {
+    type TypeClassType <: QueryKeyValue[A];
+    val typeClassInstance: TypeClassType
+  };
+  object ops {
+    @java.lang.SuppressWarnings(
+      scala.Array("org.wartremover.warts.ExplicitImplicitTypes", "org.wartremover.warts.ImplicitConversion")
+    )
+    implicit def toAllQueryKeyValueOps[A](target: A)(implicit tc: QueryKeyValue[A]): AllOps[A] {
+      type TypeClassType = QueryKeyValue[A]
+    } = {
+      final class $anon extends AllOps[A] {
+        type TypeClassType = QueryKeyValue[A];
+        val self = target;
+        val typeClassInstance: TypeClassType = tc
+      };
+      new $anon()
+    }
+  }
 }
 
 sealed trait QueryKeyValueInstances {
@@ -92,33 +232,69 @@ sealed trait QueryKeyValueInstances {
     QueryKeyValue(_._1, _._2)
 }
 
-@typeclass trait TraversableParams[A] {
-  def toSeq(a: A): Seq[(String, Option[String])]
-  def toVector(a: A): Vector[(String, Option[String])] =
-    toSeq(a).toVector
-}
-
+@ _root_.scala.annotation.implicitNotFound("Could not find an instance of TraversableParams for ${A}")
+trait TraversableParams[A] extends _root_.scala.Any with _root_.scala.Serializable {
+  def toSeq(a: A): Seq[scala.Tuple2[String, Option[String]]];
+  def toVector(a: A): Vector[scala.Tuple2[String, Option[String]]] = toSeq(a).toVector
+};
 object TraversableParams extends TraversableParamsInstances {
   implicit def field[K <: Symbol, V](implicit K: Witness.Aux[K], V: QueryValue[V]): TraversableParams[FieldType[K, V]] =
-    (a: FieldType[K, V]) => List(K.value.name -> V.queryValue(a))
-
+    (a: FieldType[K, V]) => List(K.value.name.->(V.queryValue(a)));
   implicit def sub[K <: Symbol, V](implicit
       K: Witness.Aux[K],
       V: TraversableParams[V]
-  ): TraversableParams[FieldType[K, V]] =
-    (a: FieldType[K, V]) => V.toSeq(a)
-
-  implicit val hnil: TraversableParams[HNil] =
-    (_: HNil) => List.empty
-
+  ): TraversableParams[FieldType[K, V]] = (a: FieldType[K, V]) => V.toSeq(a);
+  implicit val hnil: TraversableParams[HNil] = (x$20: HNil) => List.empty;
   implicit def hcons[H, T <: HList](implicit
       H: TraversableParams[H],
       T: TraversableParams[T]
-  ): TraversableParams[H :: T] =
-    (a: H :: T) => H.toSeq(a.head) ++ T.toSeq(a.tail)
-
+  ): TraversableParams[::[H, T]] = (a: ::[H, T]) => H.toSeq(a.head).++(T.toSeq(a.tail));
   def product[A, R <: HList](implicit gen: LabelledGeneric.Aux[A, R], R: TraversableParams[R]): TraversableParams[A] =
-    (a: A) => R.toSeq(gen.to(a))
+    (a: A) => R.toSeq(gen.to(a));
+  @scala.inline
+  def apply[A](implicit instance: TraversableParams[A]): TraversableParams[A] = instance;
+  trait BaseOps[A] {
+    type TypeClassType <: TraversableParams[A];
+    val typeClassInstance: TypeClassType;
+    def self: A;
+    def toSeq: Seq[scala.Tuple2[String, Option[String]]] = typeClassInstance.toSeq(self);
+    def toVector: Vector[scala.Tuple2[String, Option[String]]] = typeClassInstance.toVector(self)
+  };
+  trait ToTraversableParamsOps {
+    @java.lang.SuppressWarnings(
+      scala.Array("org.wartremover.warts.ExplicitImplicitTypes", "org.wartremover.warts.ImplicitConversion")
+    )
+    implicit def toTraversableParamsOps[A](target: A)(implicit tc: TraversableParams[A]): BaseOps[A] {
+      type TypeClassType = TraversableParams[A]
+    } = {
+      final class $anon extends BaseOps[A] {
+        type TypeClassType = TraversableParams[A];
+        val self = target;
+        val typeClassInstance: TypeClassType = tc
+      };
+      new $anon()
+    }
+  };
+  object nonInheritedOps extends ToTraversableParamsOps;
+  trait AllOps[A] extends BaseOps[A] {
+    type TypeClassType <: TraversableParams[A];
+    val typeClassInstance: TypeClassType
+  };
+  object ops {
+    @java.lang.SuppressWarnings(
+      scala.Array("org.wartremover.warts.ExplicitImplicitTypes", "org.wartremover.warts.ImplicitConversion")
+    )
+    implicit def toAllTraversableParamsOps[A](target: A)(implicit tc: TraversableParams[A]): AllOps[A] {
+      type TypeClassType = TraversableParams[A]
+    } = {
+      final class $anon extends AllOps[A] {
+        type TypeClassType = TraversableParams[A];
+        val self = target;
+        val typeClassInstance: TypeClassType = tc
+      };
+      new $anon()
+    }
+  }
 }
 
 sealed trait TraversableParamsInstances1 {
